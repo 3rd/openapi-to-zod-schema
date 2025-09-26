@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertOpenAPISpecToZodSchemas, type OpenAPISchemaObject, type OpenAPISpec } from "./converter.ts";
+import {
+  convertOpenAPISpecToZodSchemas,
+  type OpenAPISchemaObject,
+  type OpenAPISchemaString,
+  type OpenAPISpec,
+} from "./converter.ts";
 
 describe("OpenAPI to Zod Converter", () => {
   it("converts basic types correctly", () => {
@@ -46,6 +51,46 @@ describe("OpenAPI to Zod Converter", () => {
     });
     expect(missingRequired.success).toBe(false);
   });
+
+  it.each([
+    {
+      name: "minimum length",
+      schema: { type: "string", minLength: 2 },
+      accepted: ["ab", "😀a", "abcd"],
+      rejected: ["", "a", "😀"],
+    },
+    {
+      name: "maximum length",
+      schema: { type: "string", maxLength: 1 },
+      accepted: ["", "a", "😀"],
+      rejected: ["ab", "😀a", "e\u0301"],
+    },
+    {
+      name: "combined length bounds",
+      schema: { type: "string", minLength: 2, maxLength: 3 },
+      accepted: ["ab", "abc"],
+      rejected: ["a", "abcd"],
+    },
+    {
+      name: "zero length bounds",
+      schema: { type: "string", minLength: 0, maxLength: 0 },
+      accepted: [""],
+      rejected: ["a"],
+    },
+  ] satisfies { name: string; schema: OpenAPISchemaString; accepted: string[]; rejected: string[] }[])(
+    "enforces $name in Unicode code points",
+    ({ schema, accepted, rejected }) => {
+      const { map } = convertOpenAPISpecToZodSchemas({ components: { schemas: { Value: schema } } });
+
+      for (const value of accepted) {
+        expect(map.Value.parse(value)).toBe(value);
+      }
+
+      for (const value of rejected) {
+        expect(map.Value.safeParse(value).success).toBe(false);
+      }
+    }
+  );
 
   it("validates required references without duplicate missing-field errors", () => {
     const spec: OpenAPISpec = {

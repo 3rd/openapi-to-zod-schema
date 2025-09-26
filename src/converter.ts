@@ -23,6 +23,12 @@ interface OpenAPISchemaArray extends OpenAPISchemaBase {
   items?: OpenAPISchema | undefined;
 }
 
+interface OpenAPISchemaString extends OpenAPISchemaBase {
+  type: "string";
+  minLength?: number;
+  maxLength?: number;
+}
+
 interface OpenAPISchemaAllOf extends OpenAPISchemaBase {
   allOf: OpenAPISchema[];
 }
@@ -49,7 +55,8 @@ type OpenAPISchema =
   | OpenAPISchemaBase
   | OpenAPISchemaObject
   | OpenAPISchemaOneOf
-  | OpenAPISchemaRef;
+  | OpenAPISchemaRef
+  | OpenAPISchemaString;
 
 interface OpenAPISpec {
   components?: {
@@ -123,8 +130,11 @@ const isObjectSchema = (schema: OpenAPISchema): schema is OpenAPISchemaObject =>
 };
 const isArraySchema = (schema: OpenAPISchema): schema is OpenAPISchemaArray =>
   "type" in schema && schema.type === "array";
-const isStringSchema = (schema: OpenAPISchema): schema is OpenAPISchemaBase =>
-  "type" in schema && schema.type === "string";
+
+const isStringSchema = (schema: OpenAPISchema): schema is OpenAPISchemaString => {
+  return "type" in schema && schema.type === "string";
+};
+
 const isNumberSchema = (schema: OpenAPISchema) => "type" in schema && schema.type === "number";
 const isIntegerSchema = (schema: OpenAPISchema) => "type" in schema && schema.type === "integer";
 const isBooleanSchema = (schema: OpenAPISchema): schema is OpenAPISchemaBase =>
@@ -363,7 +373,7 @@ class OpenAPIToZodConverter {
     if (isEnumSchema(schema)) return this.convertEnumSchema(schema);
     if (isObjectSchema(schema)) return this.convertObjectSchema(schema);
     if (isArraySchema(schema)) return this.convertArraySchema(schema);
-    if (isStringSchema(schema)) return z.string();
+    if (isStringSchema(schema)) return this.convertStringSchema(schema);
     if (isIntegerSchema(schema)) return z.int();
     if (isNumberSchema(schema)) return z.number();
     if (isBooleanSchema(schema)) return z.boolean();
@@ -557,6 +567,20 @@ class OpenAPIToZodConverter {
     return z.object(shape);
   }
 
+  private convertStringSchema(schema: OpenAPISchemaString) {
+    let converted = z.string();
+
+    if (schema.minLength !== undefined) {
+      converted = converted.min(schema.minLength);
+    }
+
+    if (schema.maxLength !== undefined) {
+      converted = converted.max(schema.maxLength);
+    }
+
+    return converted;
+  }
+
   private convertArraySchema(schema: OpenAPISchemaArray) {
     const itemSchema = schema.items
       ? this.convertSchema(schema.items, { references: "lazy", seenRefs: new Set() })
@@ -606,6 +630,7 @@ export {
   type OpenAPISchemaBase,
   type OpenAPISchemaObject,
   type OpenAPISchemaRef,
+  type OpenAPISchemaString,
   type OpenAPISpec,
   isObjectSchema,
   OpenAPIToZodConverter,
