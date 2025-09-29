@@ -140,7 +140,22 @@ class ZodSchemaCodeGenerator {
         .map((option, index) => this.generateSchemaCode(option, `${schemaName}.union.${index}`))
         .join(", ")}])`;
     } else if (schema instanceof z.ZodString) {
-      return "z.string()";
+      let result = "z.string()";
+      for (const check of schema._def.checks) {
+        switch (check.kind) {
+          case "min": {
+            result += `.min(${check.value})`;
+            break;
+          }
+          case "max": {
+            result += `.max(${check.value})`;
+            break;
+          }
+          default:
+            throw new Error(`unsupported check kind: ${check.kind}`);
+        }
+      }
+      return result;
     } else if (schema instanceof z.ZodNumber) {
       if (schema.format === "safeint") return "z.int()";
       return "z.number()";
