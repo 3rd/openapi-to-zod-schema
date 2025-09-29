@@ -92,6 +92,29 @@ describe("OpenAPI to Zod Converter", () => {
     }
   );
 
+  it("validates date strings without coercing them", () => {
+    const { map } = convertOpenAPISpecToZodSchemas({
+      components: {
+        schemas: {
+          Date: { type: "string", format: "date", nullable: true },
+          LongDate: { type: "string", format: "date", minLength: 11 },
+          ShortDate: { type: "string", format: "date", maxLength: 9 },
+          Custom: { type: "string", format: "vendor-specific", minLength: 1 },
+        },
+      },
+    });
+
+    expect(map.Date.parse("2024-02-29")).toBe("2024-02-29");
+    expect(map.Date.parse(null)).toBe(null);
+    expect(map.Date.safeParse("2023-02-29").success).toBe(false);
+    expect(map.Date.safeParse("2024-02-29T00:00:00Z").success).toBe(false);
+    expect(map.Date.safeParse(new Date("2024-02-29")).success).toBe(false);
+    expect(map.LongDate.safeParse("2024-02-29").success).toBe(false);
+    expect(map.ShortDate.safeParse("2024-02-29").success).toBe(false);
+    expect(map.Custom.parse("text")).toBe("text");
+    expect(map.Custom.safeParse("").success).toBe(false);
+  });
+
   it("validates required references without duplicate missing-field errors", () => {
     const spec: OpenAPISpec = {
       components: {

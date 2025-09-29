@@ -140,22 +140,7 @@ class ZodSchemaCodeGenerator {
         .map((option, index) => this.generateSchemaCode(option, `${schemaName}.union.${index}`))
         .join(", ")}])`;
     } else if (schema instanceof z.ZodString) {
-      let result = "z.string()";
-      for (const check of schema._def.checks) {
-        switch (check.kind) {
-          case "min": {
-            result += `.min(${check.value})`;
-            break;
-          }
-          case "max": {
-            result += `.max(${check.value})`;
-            break;
-          }
-          default:
-            throw new Error(`unsupported check kind: ${check.kind}`);
-        }
-      }
-      return result;
+      return this.generateStringCode(schema);
     } else if (schema instanceof z.ZodNumber) {
       if (schema.format === "safeint") return "z.int()";
       return "z.number()";
@@ -263,6 +248,25 @@ class ZodSchemaCodeGenerator {
       const [name] = first_entry.value;
       processElement(result.length, name);
     }
+  }
+
+  private generateStringCode(schema: z.ZodString) {
+    let code = "z.string()";
+
+    if (schema.format === "date") {
+      code = "z.iso.date()";
+    }
+
+    const { minLength, maxLength } = schema;
+    if (minLength !== null) {
+      code += `.min(${minLength})`;
+    }
+
+    if (maxLength !== null) {
+      code += `.max(${maxLength})`;
+    }
+
+    return code;
   }
 
   private generateObjectCode(schema: z.ZodObject<z.core.$ZodShape>, schemaName: string): string {

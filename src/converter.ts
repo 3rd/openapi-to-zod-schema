@@ -27,6 +27,7 @@ interface OpenAPISchemaString extends OpenAPISchemaBase {
   type: "string";
   minLength?: number;
   maxLength?: number;
+  format?: string;
 }
 
 interface OpenAPISchemaAllOf extends OpenAPISchemaBase {
@@ -576,6 +577,10 @@ class OpenAPIToZodConverter {
 
     if (schema.maxLength !== undefined) {
       converted = converted.max(schema.maxLength);
+    }
+
+    if (schema.format === "date") {
+      converted = converted.check(z.iso.date());
     }
 
     return converted;

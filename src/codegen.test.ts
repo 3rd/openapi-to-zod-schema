@@ -105,6 +105,47 @@ export const PostSchema = z.object({
 });`);
   });
 
+  it("generates string length and date validation through references and compositions", async () => {
+    const code = codegen({
+      components: {
+        schemas: {
+          Entry: {
+            type: "object",
+            properties: {
+              name: { $ref: "#/components/schemas/Name" },
+              mark: { type: "string", maxLength: 1 },
+              date: { type: "string", format: "date", nullable: true },
+              empty: { type: "string", minLength: 0, maxLength: 0 },
+            },
+            required: ["name", "mark", "date", "empty"],
+          },
+          Name: { type: "string", minLength: 2, maxLength: 3 },
+          Choice: { type: "string", minLength: 2, allOf: [{ enum: ["a", "ok"] }] },
+          LongDate: { type: "string", format: "date", minLength: 11 },
+          ShortDate: { type: "string", format: "date", maxLength: 9 },
+        },
+      },
+    });
+    const entry = await evaluateSchema(code, "EntrySchema");
+    const valid = { name: "😀a", mark: "😀", date: "2024-02-29", empty: "" };
+
+    expect(findTypeErrors(code)).toEqual([]);
+    expect(entry.parse(valid)).toEqual(valid);
+    expect(entry.safeParse({ ...valid, name: "😀" }).success).toBe(false);
+    expect(entry.safeParse({ ...valid, name: "abcd" }).success).toBe(false);
+    expect(entry.safeParse({ ...valid, mark: "ab" }).success).toBe(false);
+    expect(entry.safeParse({ ...valid, date: "2023-02-29" }).success).toBe(false);
+    expect(entry.safeParse({ ...valid, date: null }).success).toBe(true);
+    expect(entry.safeParse({ ...valid, empty: "a" }).success).toBe(false);
+
+    const choice = await evaluateSchema(code, "ChoiceSchema");
+    expect(choice.parse("ok")).toBe("ok");
+    expect(choice.safeParse("a").success).toBe(false);
+    expect(choice.safeParse("no").success).toBe(false);
+    expect((await evaluateSchema(code, "LongDateSchema")).safeParse("2024-02-29").success).toBe(false);
+    expect((await evaluateSchema(code, "ShortDateSchema")).safeParse("2024-02-29").success).toBe(false);
+  });
+
   it("generates schema with refs in a sequence which prevents lazy usage", () => {
     const spec = {
       components: {
@@ -803,34 +844,6 @@ export const SampleSchema = z.object({
         kind: z.literal("user"),
         name: z.string().optional()
       }), SystemUserSchema]);"
-    `);
-  });
-
-  it("generates schema with additional checks on string properties", () => {
-    const spec = {
-      components: {
-        schemas: {
-          Sample: {
-            type: "object",
-            properties: {
-              prop: {
-                type: "string",
-                minLength: 1,
-                maxLength: 5,
-              },
-            },
-            required: ["prop"],
-          },
-        },
-      },
-    };
-    const code = codegen(spec);
-    expect(code).toMatchInlineSnapshot(`
-      "import { z } from 'zod';
-
-      export const SampleSchema = z.object({
-        prop: z.string().min(1).max(5)
-      });"
     `);
   });
 });
