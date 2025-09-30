@@ -67,6 +67,8 @@ A required property with an unconstrained schema must be present, but its value 
 
 A member of an object schema's `allOf`, `anyOf`, or `oneOf` that only lists required names, such as `oneOf: [{ required: [a] }, { required: [b] }]`, applies to that object. An `allOf` member adds its names to the object's required names. An `anyOf` or `oneOf` whose members are all of this kind produces one alternative of the object per member. When the object also composes other schemas, the object's own `properties` must declare every name these members list: an `allOf` member that names another property is ignored, and so is an `anyOf` or `oneOf` that has such a member. Anywhere else, `required` without a `type` or `properties` is ignored.
 
+Empty `oneOf` and `anyOf` arrays convert to `z.never()` and reject every value, subject to the nullability rules below.
+
 `allOf` combines validation constraints rather than letting one override another. Unknown keys on the object being intersected are an exception: Zod rejects a key only when every intersected member rejects it. For objects closed with `additionalProperties: false`, that means:
 
 - Closed objects combined with each other accept the keys that any of them declares and reject all others, so a closed base schema can be extended through `allOf`. Required fields and value constraints still apply.

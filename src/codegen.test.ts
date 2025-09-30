@@ -879,4 +879,33 @@ export const SampleSchema = z.object({
       }), SystemUserSchema]);"
     `);
   });
+
+  it("preserves empty unions through generated references and compositions", async () => {
+    const spec: OpenAPISpec = {
+      components: {
+        schemas: {
+          Empty: { anyOf: [] },
+          Entry: {
+            type: "object",
+            properties: { value: { $ref: "#/components/schemas/Empty" } },
+          },
+          Choice: { anyOf: [{ $ref: "#/components/schemas/Empty" }, { type: "string" }] },
+          Typed: { type: "string", anyOf: [] },
+        },
+      },
+    };
+    const code = codegen(spec);
+    expect(findTypeErrors(code)).toEqual([]);
+
+    const entry = await evaluateSchema(code, "EntrySchema");
+    expect(entry.parse({})).toEqual({});
+    expect(entry.safeParse({ value: "anything" }).success).toBe(false);
+
+    const choice = await evaluateSchema(code, "ChoiceSchema");
+    expect(choice.parse("valid")).toBe("valid");
+    expect(choice.safeParse(123).success).toBe(false);
+
+    const typed = await evaluateSchema(code, "TypedSchema");
+    expect(typed.safeParse("anything").success).toBe(false);
+  });
 });

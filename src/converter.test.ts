@@ -587,21 +587,25 @@ describe("OpenAPI to Zod Converter", () => {
     expect(map.AnyOfType.safeParse({}).success).toBe(false);
   });
 
-  it("falls back to z.unknown() for an empty oneOf/anyOf with a warning", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it.each(["oneOf", "anyOf"] as const)("rejects values for empty %s while preserving nullability rules", (keyword) => {
     const spec: OpenAPISpec = {
       components: {
         schemas: {
-          EmptyUnion: { anyOf: [] },
+          EmptyUnion: { [keyword]: [] },
+          Nullable: { [keyword]: [], nullable: true },
+          Typed: { type: "string", [keyword]: [], nullable: true },
         },
       },
     };
 
     const { map } = convertOpenAPISpecToZodSchemas(spec);
 
-    expect(map.EmptyUnion.safeParse("anything").success).toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Empty oneOf/anyOf"));
-    warnSpy.mockRestore();
+    expect(map.EmptyUnion.safeParse("anything").success).toBe(false);
+    expect(map.EmptyUnion.safeParse(null).success).toBe(false);
+    expect(map.Nullable.parse(null)).toBe(null);
+    expect(map.Nullable.safeParse("anything").success).toBe(false);
+    expect(map.Typed.safeParse("anything").success).toBe(false);
+    expect(map.Typed.safeParse(null).success).toBe(false);
   });
 
   it("handles nested schemas correctly", () => {

@@ -479,10 +479,8 @@ class OpenAPIToZodConverter {
   }
 
   private handleUnion(schemas: OpenAPISchema[], context: SchemaConversionContext) {
-    if (schemas.length === 0) {
-      this.warnOnce("Warning: Empty oneOf/anyOf encountered; falling back to z.unknown()");
-      return z.unknown();
-    }
+    if (schemas.length === 0) return z.never();
+
     const convertedSchemas = schemas.map((member) => this.convertSchema(member, context));
     if (convertedSchemas.every((member) => member instanceof z.ZodUnknown)) return z.unknown();
 
