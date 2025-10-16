@@ -79,4 +79,37 @@ describe("codegen", () => {
       });"
     `);
   });
+
+  it("generates schema with additional checks on string properties", () => {
+    const spec = {
+      components: {
+        schemas: {
+          Sample: {
+            type: "object",
+            properties: {
+              prop: {
+                type: "string",
+                minLength: 1,
+                maxLength: 5,
+              },
+              dateprop: {
+                type: "string",
+                format: "date",
+              },
+            },
+            required: ["prop", "dateprop"],
+          },
+        },
+      },
+    };
+    const code = codegen(spec);
+    expect(code).toMatchInlineSnapshot(`
+      "import { z } from 'zod';
+
+      export const SampleSchema = z.object({
+        prop: z.string().min(1).max(5),
+        dateprop: z.string().date()
+      });"
+    `);
+  });
 });

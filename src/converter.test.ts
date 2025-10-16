@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, ZodStringDef } from "zod";
 import { convertOpenAPISpecToZodSchemas, OpenAPISpec } from "./converter";
 
 const unwrapLazy = <T extends z.ZodTypeAny>(schema: z.ZodLazy<T>): T => {
@@ -49,6 +49,86 @@ describe("OpenAPI to Zod Converter", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  it("converts string validations correctly", () => {
+    const spec: OpenAPISpec = {
+      components: {
+        schemas: {
+          BasicTypes: {
+            type: "object",
+            properties: {
+              stringProp: { type: "string", minLength: 1, maxLength: 5 },
+            },
+            required: ["stringProp"],
+          },
+        },
+      },
+    };
+
+    const zodSchemas = convertOpenAPISpecToZodSchemas(spec);
+    const StringTypesSchemaLazy = zodSchemas.map.BasicTypes as z.ZodLazy<z.ZodObject<z.ZodRawShape>>;
+    const StringTypesSchema = unwrapLazy(StringTypesSchemaLazy);
+
+    // test that the schema is wrapped in lazy
+    expect(StringTypesSchemaLazy).toBeInstanceOf(z.ZodLazy);
+
+    // test schema structure
+    expect(StringTypesSchema.shape.stringProp).toBeInstanceOf(z.ZodString);
+    const checks = (StringTypesSchema.shape.stringProp._def as ZodStringDef).checks;
+    expect(checks).toContainEqual({ kind: "min", value: 1 });
+    expect(checks).toContainEqual({ kind: "max", value: 5 });
+
+    const parsed = StringTypesSchemaLazy.safeParse({
+      stringProp: "test",
+    });
+    expect(parsed.success).toBe(true);
+    const invalidMinLengthParsed = StringTypesSchemaLazy.safeParse({
+      stringProp: "",
+    });
+    expect(invalidMinLengthParsed.success).toBe(false);
+
+    const invalidMaxLengthParsed = StringTypesSchemaLazy.safeParse({
+      stringProp: "longtest",
+    });
+    expect(invalidMaxLengthParsed.success).toBe(false);
+  });
+
+  it("converts string formatted date validations correctly", () => {
+    const spec: OpenAPISpec = {
+      components: {
+        schemas: {
+          BasicTypes: {
+            type: "object",
+            properties: {
+              stringProp: { type: "string", format: "date" },
+            },
+            required: ["stringProp"],
+          },
+        },
+      },
+    };
+
+    const zodSchemas = convertOpenAPISpecToZodSchemas(spec);
+    const StringTypesSchemaLazy = zodSchemas.map.BasicTypes as z.ZodLazy<z.ZodObject<z.ZodRawShape>>;
+    const StringTypesSchema = unwrapLazy(StringTypesSchemaLazy);
+
+    // test that the schema is wrapped in lazy
+    expect(StringTypesSchemaLazy).toBeInstanceOf(z.ZodLazy);
+
+    // test schema structure
+    expect(StringTypesSchema.shape.stringProp).toBeInstanceOf(z.ZodString);
+    const checks = (StringTypesSchema.shape.stringProp._def as ZodStringDef).checks;
+    expect(checks).toContainEqual({ kind: "date" });
+
+    const parsed = StringTypesSchemaLazy.safeParse({
+      stringProp: "1970-01-01",
+    });
+    expect(parsed.success).toBe(true);
+    const invalidDateParsed = StringTypesSchemaLazy.safeParse({
+      stringProp: "70-1-1",
+    });
+    expect(invalidDateParsed.success).toBe(false);
   });
 
   it("handles $ref correctly", () => {

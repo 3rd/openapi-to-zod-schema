@@ -19,6 +19,13 @@ interface OpenAPISchemaArray extends OpenAPISchemaBase {
   items?: OpenAPISchema | undefined;
 }
 
+interface OpenAPISchemaString extends OpenAPISchemaBase {
+  type: "string";
+  format?: "date";
+  minLength?: number;
+  maxLength?: number;
+}
+
 interface OpenAPISchemaAllOf {
   allOf: OpenAPISchema[];
 }
@@ -42,7 +49,8 @@ type OpenAPISchema =
   | OpenAPISchemaBase
   | OpenAPISchemaObject
   | OpenAPISchemaOneOf
-  | OpenAPISchemaRef;
+  | OpenAPISchemaRef
+  | OpenAPISchemaString;
 
 interface OpenAPISpec {
   components: {
@@ -58,7 +66,7 @@ const isObjectSchema = (schema: OpenAPISchema): schema is OpenAPISchemaObject =>
   "type" in schema && schema.type === "object";
 const isArraySchema = (schema: OpenAPISchema): schema is OpenAPISchemaArray =>
   "type" in schema && schema.type === "array";
-const isStringSchema = (schema: OpenAPISchema): schema is OpenAPISchemaBase =>
+const isStringSchema = (schema: OpenAPISchema): schema is OpenAPISchemaString =>
   "type" in schema && schema.type === "string";
 const isNumberSchema = (schema: OpenAPISchema): schema is OpenAPISchemaBase =>
   "type" in schema && (schema.type === "number" || schema.type === "integer");
@@ -150,14 +158,27 @@ class OpenAPIToZodConverter {
     return schema.nullable ? arraySchema.nullable() : arraySchema;
   }
 
-  private convertStringSchema(schema: OpenAPISchemaBase): z.ZodTypeAny {
+  private convertStringSchema(schema: OpenAPISchemaString): z.ZodTypeAny {
     if (schema.enum) {
       if (schema.enum.length === 1) {
         return z.literal(schema.enum[0]);
       }
       return z.enum(schema.enum as [string, ...string[]]);
     }
-    const stringSchema = z.string();
+    let stringSchema = z.string();
+    if (schema.minLength !== undefined) {
+      stringSchema = stringSchema.min(schema.minLength);
+    }
+    if (schema.maxLength !== undefined) {
+      stringSchema = stringSchema.max(schema.maxLength);
+    }
+    if (schema.format !== undefined) {
+      switch (schema.format) {
+        case "date":
+          stringSchema = stringSchema.date();
+          break;
+      }
+    }
     return schema.nullable ? stringSchema.nullable() : stringSchema;
   }
 

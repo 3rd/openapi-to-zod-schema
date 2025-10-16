@@ -78,7 +78,26 @@ class ZodSchemaCodeGenerator {
         .map((opt: z.ZodTypeAny, index: number) => this.generateSchemaCode(opt, `${schemaName}.union.${index}`))
         .join(", ")}])`;
     } else if (schema instanceof z.ZodString) {
-      return "z.string()";
+      let result = "z.string()";
+      for (const check of schema._def.checks) {
+        switch (check.kind) {
+          case "min": {
+            result += `.min(${check.value})`;
+            break;
+          }
+          case "max": {
+            result += `.max(${check.value})`;
+            break;
+          }
+          case "date": {
+            result += `.date()`;
+            break;
+          }
+          default:
+            throw new Error(`unsupported check kind: ${check.kind}`);
+        }
+      }
+      return result;
     } else if (schema instanceof z.ZodNumber) {
       return "z.number()";
     } else if (schema instanceof z.ZodBoolean) {

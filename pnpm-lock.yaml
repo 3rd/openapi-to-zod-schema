@@ -11,8 +11,8 @@ importers:
         specifier: ^2.4.5
         version: 2.4.5
       zod:
-        specifier: ^3.21.4
-        version: 3.21.4
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       "@commitlint/cli":
         specifier: ^19.3.0
@@ -3535,9 +3535,9 @@ packages:
       { integrity: sha512-Ct97huExsu7cWeEjmrXlofevF8CvzUglJ4iGUet5B8xn1oumtAZBpHU4GzYuoE6PVqcZ5hghtBrSlhwHuR1Jmw== }
     engines: { node: ">=18" }
 
-  zod@3.21.4:
+  zod@3.25.76:
     resolution:
-      { integrity: sha512-m46AKbrzKVzOzs/DZgVnG5H55N1sv1M8qZU3A8RIKbs3mrACDNeIOeilDymVb2HdmP8uwshOCF4uJ8uM9rCqJw== }
+      { integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ== }
 
 snapshots:
   "@ampproject/remapping@2.3.0":
@@ -6701,4 +6701,4 @@ snapshots:
 
   yoctocolors@2.0.2: {}
 
-  zod@3.21.4: {}
+  zod@3.25.76: {}
