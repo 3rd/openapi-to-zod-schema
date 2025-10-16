@@ -108,6 +108,8 @@ class ZodSchemaCodeGenerator {
       }
       const lazySchema = schema as ZodSchemaWithDef<ZodLazyDef>;
       return `z.lazy(() => ${this.generateSchemaCode(lazySchema._def.getter(), schemaName)})`;
+    } else if (schema instanceof z.ZodNever) {
+      return "z.never()";
     }
     return "z.unknown()";
   }

@@ -110,6 +110,9 @@ class OpenAPIToZodConverter {
 
   private handleAnyOf(schemas: OpenAPISchema[]): z.ZodTypeAny {
     const convertedSchemas = schemas.map((s) => this.convertSchema(s));
+    if (convertedSchemas.length == 0) {
+      return z.never();
+    }
     if (convertedSchemas.length === 1) {
       return convertedSchemas[0];
     }

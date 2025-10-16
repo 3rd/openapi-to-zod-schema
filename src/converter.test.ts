@@ -151,6 +151,25 @@ describe("OpenAPI to Zod Converter", () => {
     expect(parsedNumber.success).toBe(true);
   });
 
+  it("handles empty oneOf correctly", () => {
+    const spec = {
+      components: {
+        schemas: {
+          OneOfType: {
+            oneOf: [],
+          },
+        },
+      },
+    };
+
+    const zodSchemas = convertOpenAPISpecToZodSchemas(spec);
+    const OneOfTypeSchemaLazy = zodSchemas.map.OneOfType as z.ZodLazy<z.ZodNever>;
+    const OneOfTypeSchema = unwrapLazy(OneOfTypeSchemaLazy);
+
+    expect(OneOfTypeSchemaLazy).toBeInstanceOf(z.ZodLazy);
+    expect(OneOfTypeSchema).toBeInstanceOf(z.ZodNever);
+  });
+
   it("handles anyOf correctly", () => {
     const spec = {
       components: {
@@ -179,6 +198,25 @@ describe("OpenAPI to Zod Converter", () => {
     expect(parsed1.success).toBe(true);
     expect(parsed2.success).toBe(true);
     expect(parsedBoth.success).toBe(true);
+  });
+
+  it("handles empty anyOf correctly", () => {
+    const spec = {
+      components: {
+        schemas: {
+          AnyOfType: {
+            anyOf: [],
+          },
+        },
+      },
+    };
+
+    const zodSchemas = convertOpenAPISpecToZodSchemas(spec);
+    const AnyOfTypeSchemaLazy = zodSchemas.map.AnyOfType as z.ZodLazy<z.ZodNever>;
+    const AnyOfTypeSchema = unwrapLazy(AnyOfTypeSchemaLazy);
+
+    expect(AnyOfTypeSchemaLazy).toBeInstanceOf(z.ZodLazy);
+    expect(AnyOfTypeSchema).toBeInstanceOf(z.ZodNever);
   });
 
   it("handles nested schemas correctly", () => {

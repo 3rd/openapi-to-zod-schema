@@ -79,4 +79,21 @@ describe("codegen", () => {
       });"
     `);
   });
+  it("generates schema with empty oneOf", () => {
+    const spec = {
+      components: {
+        schemas: {
+          Sample: {
+            oneOf: [],
+          },
+        },
+      },
+    };
+    const code = codegen(spec);
+    expect(code).toMatchInlineSnapshot(`
+      "import { z } from 'zod';
+
+      export const SampleSchema = z.never();"
+    `);
+  });
 });
