@@ -79,4 +79,97 @@ describe("codegen", () => {
       });"
     `);
   });
+  it("generates union schema with discriminator", () => {
+    const spec = {
+      components: {
+        schemas: {
+          User: {
+            oneOf: [
+              {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  kind: { type: "string", enum: ["user"] },
+                  name: { type: "string" },
+                },
+                required: ["id", "kind"],
+              },
+              {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  kind: { type: "string", enum: ["systemuser"] },
+                  system: { type: "string" },
+                },
+                required: ["id", "kind"],
+              },
+            ],
+          },
+        },
+      },
+    };
+    const code = codegen(spec);
+    expect(code).toMatchInlineSnapshot(`
+      "import { z } from 'zod';
+
+      export const UserSchema = z.discriminatedUnion("kind", [z.object({
+        id: z.number(),
+        kind: z.literal("user"),
+        name: z.string().optional()
+      }), z.object({
+        id: z.number(),
+        kind: z.literal("systemuser"),
+        system: z.string().optional()
+      })]);"
+    `);
+  });
+  it("generates union schema with discriminator for referenced schemas", () => {
+    const spec = {
+      components: {
+        schemas: {
+          SystemUser: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              kind: { type: "string", enum: ["systemuser"] },
+              system: { type: "string" },
+            },
+            required: ["id", "kind"],
+          },
+          User: {
+            oneOf: [
+              {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  kind: { type: "string", enum: ["user"] },
+                  name: { type: "string" },
+                },
+                required: ["id", "kind"],
+              },
+              {
+                $ref: "#/components/schemas/SystemUser",
+              },
+            ],
+          },
+        },
+      },
+    };
+    const code = codegen(spec);
+    expect(code).toMatchInlineSnapshot(`
+      "import { z } from 'zod';
+
+      export const SystemUserSchema = z.object({
+        id: z.number(),
+        kind: z.literal("systemuser"),
+        system: z.string().optional()
+      });
+
+      export const UserSchema = z.discriminatedUnion("kind", [z.object({
+        id: z.number(),
+        kind: z.literal("user"),
+        name: z.string().optional()
+      }), SystemUserSchema]);"
+    `);
+  });
 });

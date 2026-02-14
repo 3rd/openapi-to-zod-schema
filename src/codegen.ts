@@ -50,6 +50,27 @@ class ZodSchemaCodeGenerator {
     this.prefix = prefix;
   }
 
+  private guessDiscriminatorPropertyName(schemas: z.ZodTypeAny[]): string | undefined {
+    let possibleFieldNames = schemas.reduce((possibleFieldNames: string[] | undefined, schema) => {
+      if (schema instanceof z.ZodLazy) {
+        const referencedName = Object.entries(this.schemas).find(([, s]) => s === schema)?.[0];
+        if (referencedName) {
+          if (!this.currentlyGenerating.has(referencedName)) {
+            //analyze already exported schema
+            schema = schema.schema;
+          }
+        }
+      }
+      if (!(schema instanceof z.ZodObject)) return [];
+      let keys = Object.keys(schema.shape);
+      let literalFieldNames = keys.filter((key) => schema.shape[key] instanceof z.ZodLiteral);
+      if (possibleFieldNames === undefined) return literalFieldNames;
+      return possibleFieldNames.filter((fieldName) => literalFieldNames.includes(fieldName));
+    }, undefined);
+    if (possibleFieldNames && possibleFieldNames.length > 0) return possibleFieldNames[0];
+    return undefined;
+  }
+
   private generateSchemaCode(schema: z.ZodTypeAny, schemaName: string): string {
     const referencedSchemaName = Object.entries(this.schemas).find(([, s]) => s === schema)?.[0];
     if (
@@ -74,6 +95,13 @@ class ZodSchemaCodeGenerator {
     } else if (schema instanceof z.ZodUnion) {
       const unionSchema = schema as ZodSchemaWithDef<ZodUnionDef>;
       const options = unionSchema._def.options;
+
+      let discriminatorPropertyName = this.guessDiscriminatorPropertyName(options);
+      if (discriminatorPropertyName) {
+        return `z.discriminatedUnion("${discriminatorPropertyName}", [${options
+          .map((opt: z.ZodTypeAny, index: number) => this.generateSchemaCode(opt, `${schemaName}.union.${index}`))
+          .join(", ")}])`;
+      }
       return `z.union([${options
         .map((opt: z.ZodTypeAny, index: number) => this.generateSchemaCode(opt, `${schemaName}.union.${index}`))
         .join(", ")}])`;
