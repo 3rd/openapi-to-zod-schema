@@ -132,6 +132,9 @@ class ZodSchemaCodeGenerator {
         if (this.currentlyGenerating.has(referencedName)) {
           return `z.lazy(() => ${this.prefix}${referencedName}Schema)`;
         }
+        if (!this.generatedSchemas.has(referencedName)) {
+          return `z.lazy(() => ${this.prefix}${referencedName}Schema)`;
+        }
         return `${this.prefix}${referencedName}Schema`;
       }
       const lazySchema = schema as ZodSchemaWithDef<ZodLazyDef>;
@@ -140,9 +143,83 @@ class ZodSchemaCodeGenerator {
     return "z.unknown()";
   }
 
+  getReferencingSchemaNames(schema: z.ZodTypeAny): string[] {
+    let me = this;
+    function extractSchemaNames(schema: z.ZodTypeAny): string[] {
+      const result: string[] = [];
+      if (schema instanceof z.ZodObject) {
+        const shape = schema.shape;
+        return Object.entries(shape)
+          .map(([key, value]) => extractSchemaNames(value as z.ZodTypeAny))
+          .flat();
+      } else if (schema instanceof z.ZodArray) {
+        return extractSchemaNames(schema.element);
+      } else if (schema instanceof z.ZodUnion) {
+        const unionSchema = schema as ZodSchemaWithDef<ZodUnionDef>;
+        const options = unionSchema._def.options;
+        return options.map((schema) => extractSchemaNames(schema)).flat();
+      } else if (schema instanceof z.ZodNullable) {
+        return extractSchemaNames(schema.unwrap());
+      } else if (schema instanceof z.ZodOptional) {
+        return extractSchemaNames(schema.unwrap());
+      } else if (schema instanceof z.ZodLazy) {
+        const referencedName = Object.entries(me.schemas).find(([, s]) => s === schema)?.[0];
+        if (referencedName) {
+          return [referencedName];
+        }
+        const lazySchema = schema as ZodSchemaWithDef<ZodLazyDef>;
+        return extractSchemaNames(lazySchema._def.getter());
+      }
+      return result;
+    }
+
+    if (schema instanceof z.ZodLazy) {
+      const lazySchema = schema as ZodSchemaWithDef<ZodLazyDef>;
+      return extractSchemaNames(lazySchema._def.getter());
+    } else {
+      return extractSchemaNames(schema);
+    }
+  }
+
+  generateSchemaSequenceFrom(dependencyMap: Map<string, string[]>): string[] {
+    let result: string[] = [];
+
+    function processElement(targetPosition: number, name: string) {
+      let depdendencies = dependencyMap.get(name);
+      if (depdendencies == undefined) {
+        return 0;
+      }
+      dependencyMap.delete(name);
+      result.splice(targetPosition, 0, name);
+      let insertedElementCount = 0;
+      for (let dependency of depdendencies) {
+        let insertedElementCountByDependency = processElement(targetPosition, dependency);
+        targetPosition += insertedElementCountByDependency;
+        insertedElementCount += insertedElementCountByDependency;
+      }
+      return insertedElementCount + 1;
+    }
+
+    while (true) {
+      let first_entry = dependencyMap.entries().next();
+      if (first_entry.done) {
+        return result;
+      }
+      const [name] = first_entry.value;
+      processElement(result.length, name);
+    }
+  }
+
   generateCode(): string {
     const imports = `import { z } from 'zod';\n\n`;
-    const schemaDefinitions = Object.entries(this.schemas)
+    const schemasToGenerate = this.generateSchemaSequenceFrom(
+      Object.entries(this.schemas).reduce((dependencyMap, [name, schema]) => {
+        dependencyMap.set(name, this.getReferencingSchemaNames(schema));
+        return dependencyMap;
+      }, new Map<string, string[]>())
+    );
+    const schemaDefinitions = schemasToGenerate
+      .map((name) => [name, this.schemas[name]] as [string, z.ZodTypeAny])
       .map(([name, schema]) => {
         if (this.currentlyGenerating.has(name)) {
           return "";
