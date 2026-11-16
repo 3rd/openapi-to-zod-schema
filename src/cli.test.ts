@@ -142,6 +142,26 @@ describe("CLI spec content sniffing", () => {
     warnSpy.mockRestore();
   });
 
+  it.each([
+    ["minLength", "short", "a nonnegative integer", "string"],
+    ["minLength", -1, "a nonnegative integer", "number"],
+    ["maxLength", 1.5, "a nonnegative integer", "number"],
+    ["maxLength", null, "a nonnegative integer", "null"],
+    ["format", 42, "a string", "number"],
+  ])("warns and ignores invalid string keyword %s=%s", (keyword, value, expectedShape, receivedType) => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const content = JSON.stringify({
+      components: { schemas: { Name: { type: "string", [keyword]: value } } },
+    });
+    const parsed = parseSpecContent(content);
+    expect(parsed.components?.schemas).toEqual({ Name: { type: "string" } });
+    expect(warnSpy).toHaveBeenCalledWith(
+      `Warning: Ignoring #/components/schemas/Name/${keyword}: expected ${expectedShape}, received ${receivedType}`
+    );
+
+    warnSpy.mockRestore();
+  });
+
   it("does not check object and array keywords on schemas of another type", () => {
     const content = '{"components":{"schemas":{"Name":{"type":"string","required":true,"properties":42,"items":42}}}}';
 
@@ -302,13 +322,18 @@ describe("CLI execution", () => {
     const directory = fs.mkdtempSync(path.join(fixturesDirectory, "valid-"));
     const inputPath = path.join(directory, "spec.yaml");
     const outputPath = path.join(directory, "schemas.ts");
-    fs.writeFileSync(inputPath, "components:\n  schemas:\n    Status:\n      type: string\n");
+    fs.writeFileSync(
+      inputPath,
+      "components:\n  schemas:\n    Status:\n      type: string\n      minLength: 0\n      maxLength: 10\n      format: date\n"
+    );
 
     const result = spawnSync(process.execPath, [cliPath, inputPath, "-o", outputPath, "--prefix", "Api"], {
       encoding: "utf8",
     });
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(`Zod schema generated and saved to ${outputPath}`);
-    expect(fs.readFileSync(outputPath, "utf8")).toContain("export const ApiStatusSchema");
+    expect(fs.readFileSync(outputPath, "utf8")).toContain(
+      "export const ApiStatusSchema = z.iso.date().min(0).max(10);"
+    );
   });
 });

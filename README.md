@@ -7,6 +7,7 @@ This package provides a CLI and library to convert the supported schema features
 - Convert OpenAPI schemas (YAML or JSON) to Zod schemas
 - Support for `allOf`, `oneOf`, `anyOf`, and `$ref` (including circular references)
 - String, numeric, and boolean enums, integer validation, `nullable`, and `additionalProperties`
+- String `minLength`, `maxLength`, and `format: date` validation
 - CLI tool for easy conversion from the command line
 - Support for both local files and remote URLs as input
 
@@ -60,6 +61,8 @@ console.log(code);
 
 A schema that declares `properties` without a `type` is converted as an object, unless it has an `enum`. Objects with declared properties strip undeclared keys from parsed output by default. Set `additionalProperties: true` to preserve them, `false` to reject them, or provide a schema to validate their values. A free-form object on its own preserves its contents unless `additionalProperties` restricts them. Composition can change this behavior, as described below. For an enum, `nullable: true` permits `null` even when the enum does not list it.
 
+Schemas with `type: string` preserve `minLength`, `maxLength`, and `format: date` in both runtime schemas and generated code. Length counts Unicode code points, so `😀` counts as one and `e` followed by a combining accent counts as two. Dates must be valid `YYYY-MM-DD` strings; they are not converted to JavaScript `Date` objects. String enum values must also satisfy these constraints. If these constraints exclude every member of a supported enum, the schema rejects every value except `null` when `nullable: true`.
+
 A required property with an unconstrained schema must be present, but its value may be `undefined` when validating JavaScript objects. A required name that the object does not declare must be present too, and its value is validated as an additional property. An object closed with `additionalProperties: false` cannot contain such a name, so the requirement is ignored with a warning.
 
 A member of an object schema's `allOf`, `anyOf`, or `oneOf` that only lists required names, such as `oneOf: [{ required: [a] }, { required: [b] }]`, applies to that object. An `allOf` member adds its names to the object's required names. An `anyOf` or `oneOf` whose members are all of this kind produces one alternative of the object per member. When the object also composes other schemas, the object's own `properties` must declare every name these members list: an `allOf` member that names another property is ignored, and so is an `anyOf` or `oneOf` that has such a member. Anywhere else, `required` without a `type` or `properties` is ignored.
@@ -99,7 +102,7 @@ npx openapi-to-zod-schema ./openapi.yaml --prefix Api
 
 Inputs ending in `.yaml`/`.yml` are parsed as YAML and `.json` as JSON; for other inputs (for example extensionless URLs) the CLI detects the format from the content.
 
-The CLI checks the containers and schema fields needed for safe conversion, reporting malformed structures with a JSON-pointer path such as `#/components/schemas/Pet/properties/name`. Unsupported `type`, `nullable`, and `enum` value shapes are ignored with warnings. A schema whose `type` is ignored stays unconstrained by its `properties`. Empty YAML values in component schemas, properties, and array items count as absent. Documents without `components.schemas` generate no schema declarations; this is not a full OpenAPI document validator.
+The CLI checks the containers and schema fields needed for safe conversion, reporting malformed structures with a JSON-pointer path such as `#/components/schemas/Pet/properties/name`. Unsupported `type`, `nullable`, and `enum` value shapes are ignored with warnings. On string schemas, invalid `minLength`, `maxLength`, and `format` values are also ignored with warnings: lengths must be nonnegative integers and formats must be strings. A schema whose `type` is ignored stays unconstrained by its `properties`. Empty YAML values in component schemas, properties, and array items count as absent. Documents without `components.schemas` generate no schema declarations; this is not a full OpenAPI document validator.
 
 ## API Reference
 
@@ -140,7 +143,7 @@ const code = codegen(openAPISpec, "Api");
 
 - Only `components.schemas` is converted; paths, operations, parameters, and responses are ignored.
 - `oneOf` uses union validation rather than requiring exactly one matching variant. Generated code can use `z.discriminatedUnion` when object variants share a required literal-valued property with distinct values; the OpenAPI `discriminator` keyword is not interpreted.
-- Validation constraints (`minLength`, `maxLength`, `pattern`, `minimum`, `maximum`, `format`) are not carried over.
+- `pattern`, `minimum`, `maximum`, and formats other than `date` are not carried over.
 - Numeric schemas accept only finite numbers. Integer schemas use Zod's safe-integer range, from `Number.MIN_SAFE_INTEGER` through `Number.MAX_SAFE_INTEGER`.
 - `additionalProperties: false` uses `z.strictObject`. A closed object on its own rejects unknown keys. In an intersection, it can accept keys it does not declare when another retained member allows them, including when the closed object is an `anyOf` or `oneOf` alternative. See the composition rules above.
 - Zod does not validate an object property declared as `__proto__`: it is not required, its value is not checked, and it is absent from parsed output. Component schema names such as `__proto__` are supported.
