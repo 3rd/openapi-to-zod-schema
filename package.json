@@ -1,6 +1,6 @@
 {
   "name": "openapi-to-zod-schema",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "repository": "https://github.com/3rd/openapi-to-zod-schema",
   "author": {
     "name": "Andrei Neculaesei",
