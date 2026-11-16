@@ -1,2 +1,2 @@
-export { convertOpenAPISpecToZodSchemas, type OpenAPISpec } from "./converter";
-export { codegen } from "./codegen";
+export { convertOpenAPISpecToZodSchemas, type OpenAPISpec } from "./converter.ts";
+export { codegen } from "./codegen.ts";

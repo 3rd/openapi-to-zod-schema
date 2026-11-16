@@ -3,23 +3,23 @@ on:
   pull_request:
     branches: ["master", "development"]
   push:
-    branches: ["development"]
+    branches: ["master", "development"]
 jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 19.x, 20.x]
+        node-version: [24.11.1, 24.x, 26.x]
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 9.1.4
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
-      - run: pnpm install -frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm tsc
       - run: pnpm test
+      - run: pnpm test:package
