@@ -115,6 +115,54 @@ describe("OpenAPI to Zod Converter", () => {
     expect(map.Custom.safeParse("").success).toBe(false);
   });
 
+  it.each([
+    {
+      name: "length bounds on multiple enum values",
+      schema: { type: "string", enum: ["a", "ok", "oversized", "😀😀"], minLength: 2, maxLength: 3 },
+      accepted: ["ok", "😀😀"],
+      rejected: ["a", "oversized", "new"],
+    },
+    {
+      name: "a singleton enum excluded by its constraints",
+      schema: { type: "string", enum: ["a"], minLength: 2 },
+      accepted: [],
+      rejected: ["a", "ok"],
+    },
+    {
+      name: "date validation on enum values",
+      schema: { type: "string", enum: ["2024-02-29", "2023-02-29", "bad"], format: "date" },
+      accepted: ["2024-02-29"],
+      rejected: ["2023-02-29", "bad", "2024-03-01"],
+    },
+    {
+      name: "nullability when every string enum value is excluded",
+      schema: { type: "string", enum: ["bad"], format: "date", nullable: true },
+      accepted: [null],
+      rejected: ["bad", "2024-02-29"],
+    },
+    {
+      name: "an explicit null alongside constrained enum values",
+      schema: { type: "string", enum: [null, "bad", "2024-02-29"], format: "date", nullable: true },
+      accepted: [null, "2024-02-29"],
+      rejected: ["bad"],
+    },
+  ] satisfies {
+    name: string;
+    schema: OpenAPISchemaString;
+    accepted: unknown[];
+    rejected: unknown[];
+  }[])("preserves $name", ({ schema, accepted, rejected }) => {
+    const { map } = convertOpenAPISpecToZodSchemas({ components: { schemas: { Value: schema } } });
+
+    for (const value of accepted) {
+      expect(map.Value.parse(value)).toBe(value);
+    }
+
+    for (const value of rejected) {
+      expect(map.Value.safeParse(value).success).toBe(false);
+    }
+  });
+
   it("validates required references without duplicate missing-field errors", () => {
     const spec: OpenAPISpec = {
       components: {

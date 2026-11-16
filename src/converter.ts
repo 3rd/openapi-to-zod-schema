@@ -445,9 +445,14 @@ class OpenAPIToZodConverter {
       return z.unknown();
     }
 
-    const permittedValues = values.filter((value) => matchesEnumType(value, schema));
+    let permittedValues = values.filter((value) => matchesEnumType(value, schema));
     if (permittedValues.length < values.length) {
       this.warnOnce("Warning: Enum members do not match the declared type; ignoring incompatible values");
+    }
+
+    if (isStringSchema(schema)) {
+      const stringSchema = this.convertStringSchema(schema);
+      permittedValues = permittedValues.filter((value) => value === null || stringSchema.safeParse(value).success);
     }
 
     const valuesSchema = this.convertEnumValues(permittedValues);

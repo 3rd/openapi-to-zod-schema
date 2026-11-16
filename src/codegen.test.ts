@@ -146,6 +146,39 @@ export const PostSchema = z.object({
     expect((await evaluateSchema(code, "ShortDateSchema")).safeParse("2024-02-29").success).toBe(false);
   });
 
+  it("generates only enum values satisfying the string constraints", async () => {
+    const code = codegen({
+      components: {
+        schemas: {
+          Bounded: { type: "string", enum: ["a", "ok", "oversized", "😀😀"], minLength: 2, maxLength: 3 },
+          Date: { type: "string", enum: ["2024-02-29", "2023-02-29", "bad"], format: "date" },
+          Impossible: { type: "string", enum: ["a"], minLength: 2 },
+          Nullable: { type: "string", enum: ["bad"], format: "date", nullable: true },
+        },
+      },
+    });
+    const bounded = await evaluateSchema(code, "BoundedSchema");
+    expect(bounded.parse("ok")).toBe("ok");
+    expect(bounded.parse("😀😀")).toBe("😀😀");
+    expect(bounded.safeParse("a").success).toBe(false);
+    expect(bounded.safeParse("oversized").success).toBe(false);
+    expect(bounded.safeParse("new").success).toBe(false);
+
+    const date = await evaluateSchema(code, "DateSchema");
+    expect(date.parse("2024-02-29")).toBe("2024-02-29");
+    expect(date.safeParse("2023-02-29").success).toBe(false);
+    expect(date.safeParse("bad").success).toBe(false);
+    expect(date.safeParse("2024-03-01").success).toBe(false);
+
+    const impossible = await evaluateSchema(code, "ImpossibleSchema");
+    expect(impossible.safeParse("a").success).toBe(false);
+    expect(impossible.safeParse("ok").success).toBe(false);
+
+    const nullable = await evaluateSchema(code, "NullableSchema");
+    expect(nullable.parse(null)).toBe(null);
+    expect(nullable.safeParse("bad").success).toBe(false);
+  });
+
   it("generates schema with refs in a sequence which prevents lazy usage", () => {
     const spec = {
       components: {

@@ -8,6 +8,7 @@ import {
   type OpenAPISchemaBase,
   type OpenAPISchemaObject,
   type OpenAPISchemaRef,
+  type OpenAPISchemaString,
   type OpenAPISpec,
 } from "./converter.ts";
 
@@ -128,6 +129,34 @@ const toArraySchema = (base: OpenAPISchemaBase, keywords: Record<string, unknown
   return schema;
 };
 
+const toStringSchema = (base: OpenAPISchemaBase, keywords: Record<string, unknown>, pointer: string) => {
+  const { minLength, maxLength, format, ...metadata } = keywords;
+  const schema: OpenAPISchemaString = { ...metadata, ...base, type: "string" };
+
+  for (const [keyword, bound] of [
+    ["minLength", minLength],
+    ["maxLength", maxLength],
+  ] as const) {
+    if (bound === undefined) continue;
+
+    const isValidBound = typeof bound === "number" && Number.isInteger(bound) && bound >= 0;
+    if (!isValidBound) {
+      warnIgnoredKeyword(appendPointerToken(pointer, keyword), "a nonnegative integer", bound);
+      continue;
+    }
+
+    schema[keyword] = bound;
+  }
+
+  if (typeof format === "string") {
+    schema.format = format;
+  } else if (format !== undefined) {
+    warnIgnoredKeyword(appendPointerToken(pointer, "format"), "a string", format);
+  }
+
+  return schema;
+};
+
 const toSchema = (value: unknown, pointer: string): OpenAPISchema => {
   if (!isRecord(value)) throw createShapeError(pointer, "a schema object", value);
 
@@ -181,6 +210,7 @@ const toSchema = (value: unknown, pointer: string): OpenAPISchema => {
   }
 
   if (base.type === "array") return toArraySchema(base, keywords, pointer);
+  if (base.type === "string") return toStringSchema(base, keywords, pointer);
 
   // A schema without a usable `type` is converted as an object only because of its `properties`, so two kinds of
   // schema lose that key here. An empty `properties` value counts as absent. A schema whose `type` was ignored must
